@@ -24,7 +24,7 @@ public class Mailer {
     public void sendMail(String problem) throws MessagingException {
 
         //set up list of people to be notified
-        String[] recipients = {"davy.maddelein@ugent.be"};
+        String[] recipients = {"foo.bar@email.com"};
         this.sendMail(problem, recipients);
 
     }
@@ -33,7 +33,7 @@ public class Mailer {
 
         //Set the host smtp address
         Properties props = new Properties();
-        props.put("mail.smtp.host", "vibugent.ugent.be");
+        props.put("mail.smtp.host", "host.smtp.adress");
 
         // create some properties and get the default Session
         Session session = Session.getDefaultInstance(props, null);
@@ -42,7 +42,7 @@ public class Mailer {
         Message msg = new MimeMessage(session);
 
         // set the from and to address
-        InternetAddress addressFrom = new InternetAddress("noreply@ms-limsbackupsystem.com");
+        InternetAddress addressFrom = new InternetAddress("noreply@backupsystem.com");
         msg.setFrom(addressFrom);
 
         InternetAddress[] addressTo = new InternetAddress[recipients.length];
@@ -54,7 +54,7 @@ public class Mailer {
         // Optional : You can also set your custom headers and such in the Email if you Want
 
         // Setting the Subject and Content Type
-        msg.setSubject("problem backing up ms-lims db");
+        msg.setSubject("problem backing up");
         msg.setContent(problem, "text/plain");
         Transport.send(msg);
     }
