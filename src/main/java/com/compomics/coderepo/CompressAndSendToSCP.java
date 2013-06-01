@@ -26,14 +26,6 @@ import java.util.Comparator;
  */
 public class CompressAndSendToSCP {
 
-
-/**
- * Created by IntelliJ IDEA.
- * User: Davy
- * Date: 10/18/12
- * Time: 9:43 AM
- */
-
     
         public static void main(String[] args) throws MessagingException {
 

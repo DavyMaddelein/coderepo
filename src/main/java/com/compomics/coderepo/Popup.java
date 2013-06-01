@@ -64,13 +64,14 @@ public class Popup {
         frame.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
         frame.setVisible(true);
 
-        closeButton.addActionListener(new ActionListener(){
-        public void actionPerformed(final ActionEvent e) {
+        closeButton.addActionListener(new ActionListener() {
+            public void actionPerformed(final ActionEvent e) {
                 frame.dispose();
-            }});
+            }
+        });
 
-                
-        
+
+
         Dimension scrSize = Toolkit.getDefaultToolkit().getScreenSize();// size of the screen
         Insets toolHeight = Toolkit.getDefaultToolkit().getScreenInsets(frame.getGraphicsConfiguration());// height of the task bar
         frame.setLocation(scrSize.width - frame.getWidth(), scrSize.height - toolHeight.bottom - frame.getHeight());
@@ -88,14 +89,12 @@ public class Popup {
         ;
     }
 
-.start();
+    .start();
 
 
                 }
     
     public static void main(String[] args) {
-    Popup popup = new Popup();
+        Popup popup = new Popup();
     }
-    
-    
 }

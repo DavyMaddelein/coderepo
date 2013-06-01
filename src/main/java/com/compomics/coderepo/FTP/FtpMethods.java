@@ -1,8 +1,4 @@
-/*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
- */
-package com.compomics.FTP;
+package com.compomics.coderepo.FTP;
 
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -16,7 +12,7 @@ import java.io.IOException;
  * @author Davy
  */
 public class FtpMethods {
-
+    //
     FTPClient client = new FTPClient();
 
     private void deleteFileServerSide() {
