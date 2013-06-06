@@ -88,4 +88,8 @@ public class FileDAO {
             writeExtractedDataToDisk(rovFile);
         }
     }
+    
+    public static void emptyNatterTempFolder(){
+        
+    }
 }

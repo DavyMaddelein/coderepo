@@ -40,7 +40,7 @@ public class dbDAOTest {
     @Before
     public void setUp() throws NullPointerException, URISyntaxException, MalformedURLException, MalformedURLException, IOException, SQLException {
 
-        DbConnectionController.createConnection("****", "****", "****", "****");
+        DbConnectionController.createConnection("Davy", "aerodynamic", "muppet03.ugent.be", "projects");
         tempdir = new File(System.getProperty("java.io.tmpdir") + "/rovfiletest");
         if (tempdir.exists()){
             tempdir.delete();

@@ -29,8 +29,7 @@ public class BigDataSetTest {
 
     @BeforeClass
     public static void setUpClass() throws SQLException {
-        DbConnectionController.createConnection("****", "****", "****", "****");
-        
+        DbConnectionController.createConnection("Davy", "aerodynamic", "muppet03.ugent.be", "projects");
     }
 
     @AfterClass
