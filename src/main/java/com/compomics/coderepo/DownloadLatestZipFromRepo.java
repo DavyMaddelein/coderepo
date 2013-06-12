@@ -1,6 +1,7 @@
 package com.compomics.coderepo;
 
 import java.io.BufferedInputStream;
+import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
@@ -10,16 +11,20 @@ import java.io.InputStreamReader;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLConnection;
-import java.nio.charset.MalformedInputException;
+import java.util.Comparator;
+import java.util.Enumeration;
+import java.util.Iterator;
 import java.util.Properties;
+import java.util.Scanner;
+import java.util.jar.JarEntry;
+import java.util.jar.JarFile;
 import java.util.zip.ZipInputStream;
 import javax.swing.JOptionPane;
-import javax.xml.parsers.ParserConfigurationException;
-import javax.xml.parsers.SAXParserFactory;
-import org.apache.log4j.Logger;
-import org.xml.sax.Attributes;
-import org.xml.sax.SAXException;
-import org.xml.sax.helpers.DefaultHandler;
+import javax.xml.stream.XMLEventReader;
+import javax.xml.stream.XMLInputFactory;
+import javax.xml.stream.XMLStreamException;
+import javax.xml.stream.events.Attribute;
+import javax.xml.stream.events.XMLEvent;
 
 /**
  *
@@ -27,190 +32,205 @@ import org.xml.sax.helpers.DefaultHandler;
  */
 public class DownloadLatestZipFromRepo {
 
-    private static final Logger logger = Logger.getLogger(DownloadLatestZipFromRepo.class);
-    private String toolName;
-    private String[] localVersionNumbers;
+    private Properties localJarProps = new Properties();
+    private String latestRemoteRelease;
+
+    public static void main(String[] args) throws MalformedURLException, IOException, XMLStreamException {
+        new DownloadLatestZipFromRepo(new File("C:\\Users\\Davy\\Desktop\\java\\thermo-msf-parser\\thermo_msf_parser_GUI\\target\\thermo_msf_parser_GUI-2.0.4\\thermo_msf_parser_GUI-2.0.4.jar").toURL());
+    }
 
     //main [jarPath,flag overwrite oldfiles]
-    public DownloadLatestZipFromRepo(URL jarPath) {
-        URL repoURL;
-        getLocalData(jarPath);
-        if ((repoURL = NewVersionReleased(toolName)) != null) {
-            if (compareVersionNumbers(localVersionNumbers,getVersionNumbers(repoURL))){
-                download(repoURL,new File(jarPath.getPath()));
+    public DownloadLatestZipFromRepo(URL jarPath) throws IOException, XMLStreamException {
+        if (NewVersionReleased(jarPath)) {
+            if (System.getProperty("os.name").contains("windows")) {
+                File downloadedFile = downloadForWindows(latestRemoteRelease, new File(jarPath.getPath()));
+            } else {
+                File downloadedFile = downloadForUnix(latestRemoteRelease, new File(jarPath.getPath()));
             }
+            //startup new version and in new version continue from here and import older settings
+            //ask user if we should delete files and shortcut
+            //system.properties.get(users.home)/desktop/shortcut  -> only on windows if not exists --> report
+
         }
-        //startup new version and in new version continue from here and import older settings
-        //ask user if we should delete files and shortcut
-        //system.properties.get(users.home)/desktop/shortcut  -> only on windows if not exists --> report
         //echo $javahome?
     }
 
     //this could be put in a utilities webDAO class together with other classes like socket stuff
-    public void download(URL repoUrl, File targetDownloadFolder) {
-        File file;
-        try {
-            URLConnection con = repoUrl.openConnection();
-            if (targetDownloadFolder.isDirectory()) {
-                file = new File(targetDownloadFolder.toURI() + File.separator + repoUrl.getFile());
-            } else if (targetDownloadFolder.getParentFile().isDirectory()) {
-                file = new File(targetDownloadFolder.getParentFile().toURI() + File.separator + repoUrl.getFile());
-            } else {
-                file = alternatFileName(repoUrl);
-            }
-
-            if (file != null) {
-                BufferedWriter dest = null;
-                ZipInputStream in = new ZipInputStream(new BufferedInputStream(con.getInputStream()));
-                InputStreamReader isr = new InputStreamReader(in);
-                while (in.getNextEntry() != null) {
-                    int count;
-                    char data[] = new char[1024];
-                    dest = new BufferedWriter(new FileWriter(file), 1024);
-                    while ((count = isr.read(data, 0, 1024)) != -1) {
-                        dest.write(data, 0, count);
-                    }
-                    dest.flush();
-                    dest.close();
-                }
-                isr.close();
-                in.close();
-            }
-
-        } catch (MalformedInputException mie) {
-            logger.error(mie);
-            JOptionPane.showMessageDialog(null, "something went wrong with retrieving the url to the latest update. please contact");
-
-        } catch (IOException ioe) {
-            logger.error(ioe);
-            JOptionPane.showMessageDialog(null, "there has been an error while fetching the latest update\n Please contact \n" + ioe.getMessage());
-        }
+    private File downloadForWindows(String latestVersionNumber, File targetDownloadFolder) throws IOException, MalformedURLException, XMLStreamException {
+        URL repoURL = new URL("http", "genesis.ugent.be", new StringBuilder().append("/maven2/").append(localJarProps.getProperty("groupId")).append("/").append(latestVersionNumber).toString());
+        XMLInputFactory xmlParseFactory = XMLInputFactory.newInstance();
+        XMLEventReader xmlReader = xmlParseFactory.createXMLEventReader(repoURL.openStream());
+        return downloadAndUnzipFile(getUrlOfZippedVersion(xmlReader),targetDownloadFolder);
     }
 
-    private File alternatFileName(URL repoUrl) {
+    private File getLocationToDownloadOnDisk(File targetDownloadFolder) {
         File file = null;
-        Object[] options = {"yes...", "specify other location...", "quit"};
-        Object choice = JOptionPane.showInputDialog(null, "there has been a problem with finding the location of the original file\n Do you want to download the latest update to your home folder or specify another location?", "Input", JOptionPane.INFORMATION_MESSAGE, null, options, options[0]);
-        if (choice == JOptionPane.YES_OPTION) {
-            file = new File(System.getProperty("users.home") + File.separator + repoUrl.getFile());
+        if (targetDownloadFolder.isDirectory()) {
+            file = new File(targetDownloadFolder.toURI());
+        } else if (targetDownloadFolder.getParentFile().isDirectory()) {
+            file = new File(targetDownloadFolder.getParentFile().toURI());
+        } else {
+            Object[] options = {"yes...", "specify other location...", "quit"};
+            Object choice = JOptionPane.showInputDialog(null, "there has been a problem with finding the location of the original file\n Do you want to download the latest update to your home folder or specify another location?", "Input", JOptionPane.INFORMATION_MESSAGE, null, options, options[0]);
+            //if (choice == JOptionPane.YES_OPTION) {
+            file = new File(System.getProperty("users.home"));
+            //} else if (choice == JOptionPane_NO_option){JFilechooser fileChooser = new JFileChooser(System.getProperty("users.home"),JFileChooser.FOLDER);file = fileChooser.getFile()}
         }
         return file;
     }
 
-    /**
-     * splits version numbers separated by points and assumes they are preceded
-     * by a "-"
-     *
-     * @param localJarURL
-     * @return
-     */
-    private String[] getVersionNumbers(URL jarURL) {
-        return getVersionNumbers(jarURL, "-");
+    private boolean NewVersionReleased(URL jarPath) throws IOException, XMLStreamException {
+        boolean returnValue = false;
+        CompareVersionNumbers comparator = new CompareVersionNumbers();
+        getLocalVariables(jarPath.getPath());
+        BufferedReader remoteVersionsReader = new BufferedReader(new InputStreamReader(new URL("http", "genesis.ugent.be", "/maven2/" + localJarProps.getProperty("groupId").replaceAll("\\.", "/") + "/maven-metadata.xml").openStream()));
+        latestRemoteRelease = getLatestVersionNumberFromRemoteRepo(remoteVersionsReader);
+        if (comparator.compare(localJarProps.getProperty("versionNumber"), latestRemoteRelease) == 1) {
+            returnValue = true;
+        }
+        return returnValue;
     }
 
-    /**
-     * splits version numbers separated by points and preceded by splitChar
-     *
-     * @param JarURL
-     * @param nameSeparator
-     * @return
-     */
-    private String[] getVersionNumbers(URL jarURL, String nameSeparator) {
-        return getVersionNumbers(jarURL, nameSeparator, ".");
-
-    }
-
-    private String[] getVersionNumbers(URL jarURL, String nameSeperator, String versionSeparator) {
-        return jarURL.getFile().substring(jarURL.getFile().lastIndexOf(nameSeperator)).split(versionSeparator);
-
-    }
-
-    private void getLocalData(URL jarPath) {
-        try {
-            String path = jarPath.getPath() + "!/META-INF/maven/groupId/artifactId/pom.properties";
-            InputStream stream = getClass().getResourceAsStream(path);
-            if (stream != null) {
-                Properties props = new Properties();
-                props.load(stream);
-                setVersionNumbers(props.getProperty("").split("."));
-                setToolName(props.getProperty(""));
-            } else {
-                setVersionNumbers(getVersionNumbers(jarPath));
-                setToolName(getToolName(jarPath));
+    private void getLocalVariables(String jarPath) throws IOException, NullPointerException {
+        JarFile jarFile = new JarFile(jarPath);
+        Enumeration<JarEntry> entries = jarFile.entries();
+        //no cleaner way to do this without asking for the group and artifact id, which defeats the point
+        while (entries.hasMoreElements()) {
+            JarEntry entry = entries.nextElement();
+            if (entry.getName().contains("pom.properties")) {
+                InputStream propertiesInput = jarFile.getInputStream(entry);
+                localJarProps.load(propertiesInput);
+                localJarProps.setProperty("groupId", localJarProps.getProperty("groupId").replaceAll("\\.", "/"));
             }
-        } catch (IOException ex) {
-            logger.error(ex);
-            JOptionPane.showMessageDialog(null, "there has been a problem retrieving the version name and number");
         }
     }
 
-    private void setToolName(String toolName) {
-        this.toolName = toolName;
+    private String getLatestVersionNumberFromRemoteRepo(BufferedReader remoteVersionsReader) throws XMLStreamException {
+        XMLInputFactory xmlParseFactory = XMLInputFactory.newInstance();
+        XMLEventReader xmlReader = xmlParseFactory.createXMLEventReader(remoteVersionsReader);
+        MetaDataXMLParser xmlParser = new MetaDataXMLParser(xmlReader);
+        return xmlParser.getHighestVersionNumber();
     }
 
-    private void setVersionNumbers(String[] versionNumbers) {
-        this.localVersionNumbers = versionNumbers;
-    }
-
-    private URL NewVersionReleased(String projectName) {
-        URL newVersion = null;
-        try {
-            URL releaseListURL = new URL("https://code.google.com/feeds/p/" + projectName + "/downloads/basic");
-            GoogleCodeSAXHandler handler = new GoogleCodeSAXHandler();
-            SAXParserFactory.newInstance().newSAXParser().parse(releaseListURL.openStream(), handler);
-            newVersion = handler.getDownloadURL();
-        } catch (MalformedURLException ex) {
-            //go to local repository for update
-            logger.error(ex);
-        } catch (ParserConfigurationException | SAXException ex) {
-            logger.error(ex);
-        } catch (IOException ex) {
-            logger.error(ex);
-        }
-        return newVersion;
-    }
-
-    private String getToolName(URL jarPath) {
-        return (jarPath.getFile().split("-"))[0];
-    }
-
-    private boolean compareVersionNumbers(String[] localVersionNumbers, String[] versionNumbers) {
-        //WILL PROBALBY BREAK
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
-    }
-
-    public class GoogleCodeSAXHandler extends DefaultHandler {
-
-        private String XMLvalue;
-        private URL publicDownloadURL;
-
-        @Override
-        public void startElement(String s, String s1, String elementName, Attributes attributes) throws SAXException {
-            if (elementName.equalsIgnoreCase("link")) {
-                if (attributes.getValue("rel").equalsIgnoreCase("direct")) {
-
-                    try {
-                        getVersionNumbers(new URL(attributes.getValue("href")));
-                    } catch (MalformedURLException ex) {
-                        logger.error(ex);
+    private URL getUrlOfZippedVersion(XMLEventReader xmlReader) throws MalformedURLException, IOException, XMLStreamException {
+        XMLEvent htmlTag;
+        String toReturn = null;
+        Attribute attribute;
+        while (xmlReader.hasNext()) {
+            htmlTag = xmlReader.nextEvent();
+            if (htmlTag.isStartElement()) {
+                Iterator<Attribute> attributes = htmlTag.asStartElement().getAttributes();
+                while (attributes.hasNext()) {
+                    attribute = attributes.next();
+                    if (attribute.getName().getLocalPart().equalsIgnoreCase("href") && attribute.getValue().contains(".zip")) {
+                        toReturn = attribute.getValue();
+                        break;
                     }
                 }
             }
         }
-        
-        public void endElement(){
-        //get filesize
+        return new URL(toReturn);
+    }
+
+    private File downloadForUnix(String latestRemoteRelease, File targetDownloadFolder) throws MalformedURLException, XMLStreamException, IOException {
+        URL repoURL = new URL("http", "genesis.ugent.be", new StringBuilder().append("/maven2/").append(localJarProps.getProperty("groupId")).append("/").append(latestRemoteRelease).toString());
+        XMLInputFactory xmlParseFactory = XMLInputFactory.newInstance();
+        XMLEventReader xmlReader = xmlParseFactory.createXMLEventReader(repoURL.openStream());
+        return downloadAndUnzipFile(getUrlOfZippedVersion(xmlReader),targetDownloadFolder);
+    }
+
+    private File downloadAndUnzipFile(URL urlOfZippedVersion, File jarPath) throws IOException {
+        File file;
+        URLConnection con = urlOfZippedVersion.openConnection();
+        file = getLocationToDownloadOnDisk(jarPath);
+        if (file != null) {
+            BufferedWriter dest = null;
+            ZipInputStream in = new ZipInputStream(new BufferedInputStream(con.getInputStream()));
+            InputStreamReader isr = new InputStreamReader(in);
+            while (in.getNextEntry() != null) {
+                int count;
+                char data[] = new char[1024];
+                dest = new BufferedWriter(new FileWriter(file), 1024);
+                while ((count = isr.read(data, 0, 1024)) != -1) {
+                    dest.write(data, 0, count);
+                }
+                dest.flush();
+                dest.close();
+            }
+            isr.close();
+            in.close();
+        }
+        return file;
+    }
+
+    private class MetaDataXMLParser {
+
+        private String highestVersionNumber;
+        private XMLEvent XMLEvent;
+
+        public MetaDataXMLParser(XMLEventReader xmlReader) throws XMLStreamException {
+            while (xmlReader.hasNext()) {
+                XMLEvent = xmlReader.nextEvent();
+                if (XMLEvent.isStartElement()) {
+                    if (XMLEvent.asStartElement().getName().getLocalPart().equalsIgnoreCase("versions")) {
+                        parseVersionNumbers(xmlReader);
+                        break;
+                    }
+                }
+            }
         }
 
-        @Override
-        public void characters(char[] ac, int i, int j) throws SAXException {
-            XMLvalue = new String(ac, i, j);
+        private String getHighestVersionNumber() {
+            return highestVersionNumber;
         }
 
-        public URL getDownloadURL() {
-            return publicDownloadURL;
+        private void parseVersionNumbers(XMLEventReader xmlReader) throws XMLStreamException {
+            CompareVersionNumbers versionNumberComparator = new CompareVersionNumbers();
+            while (xmlReader.hasNext()) {
+                XMLEvent = xmlReader.nextEvent();
+                if (XMLEvent.isStartElement()) {
+                    if (XMLEvent.asStartElement().getName().getLocalPart().equalsIgnoreCase("version")) {
+                        if (highestVersionNumber == null) {
+                            highestVersionNumber = xmlReader.nextEvent().asCharacters().getData();
+                        } else {
+                            String versionNumberToCompareWith = xmlReader.nextEvent().asCharacters().getData();
+                            if (versionNumberComparator.compare(highestVersionNumber, versionNumberToCompareWith) == 1) {
+                                highestVersionNumber = versionNumberToCompareWith;
+                            }
+                        }
+                    }
+                } else if (XMLEvent.isEndElement()) {
+                    if (XMLEvent.asEndElement().getName().getLocalPart().equalsIgnoreCase("versions")) {
+                        break;
+                    }
+                }
+            }
         }
     }
-    
-    //TODO: rudimentary gui
+
+    private class CompareVersionNumbers implements Comparator<String> {
+
+        @Override
+        public int compare(String oldVersionNumber, String newVersionNumber) {
+            int compareInt = -1;
+            Scanner a = (new Scanner(oldVersionNumber)).useDelimiter("\\.");
+            Scanner b = (new Scanner(newVersionNumber)).useDelimiter("\\.");
+            int i = 0, j = 0;
+            if (!newVersionNumber.contains("b") || !newVersionNumber.contains("beta")) {
+                while (a.hasNext() && b.hasNext()) {
+                    i = Integer.parseInt(a.next());
+                    j = Integer.parseInt(b.next());
+                    if (j > i) {
+                        compareInt = 1;
+                    }
+                }
+                if (b.hasNext() && !a.hasNext()) {
+                    compareInt = 1;
+                } else if (!b.hasNext() && !a.hasNext() && i == j) {
+                    compareInt = 0;
+                }
+            }
+            return compareInt;
+        }
+    }
 }
