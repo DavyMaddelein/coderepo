@@ -6,19 +6,9 @@ import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URISyntaxException;
 import java.net.URL;
-import java.util.Properties;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.ZipInputStream;
-;
 import javax.xml.stream.XMLStreamException;
-import javax.xml.stream.XMLStreamException;
-import javax.xml.stream.XMLStreamException;import javax.xml.stream.XMLStreamException;
-import javax.xml.stream.XMLStreamException;
-import javax.xml.stream.XMLStreamException;
-import javax.xml.stream.XMLStreamException;import javax.xml.stream.XMLStreamException;import javax.xml.stream.XMLStreamException;
-import javax.xml.stream.XMLStreamException;
-import javax.xml.stream.XMLStreamException;import javax.xml.stream.XMLStreamException;
-
 /**
  *
  * @author Davy

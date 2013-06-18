@@ -7,7 +7,6 @@ package com.compomics.coderepo.autoupdater;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
-import java.net.URL;
 import java.util.Enumeration;
 import java.util.Properties;
 import java.util.jar.JarEntry;
