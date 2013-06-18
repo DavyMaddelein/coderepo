@@ -4,7 +4,9 @@
  */
 package com.compomics.coderepo.autoupdater;
 
+import java.io.File;
 import java.io.IOException;
+import java.net.URI;
 import java.net.URL;
 import java.util.Enumeration;
 import java.util.Properties;
@@ -19,7 +21,7 @@ public class MavenJarFile extends JarFile {
 
 private Properties mavenProperties = new Properties();
     
-    public MavenJarFile(URL jarPath) throws IOException {
+    public MavenJarFile(URI jarPath) throws IOException {
         super(jarPath.getPath());
         Enumeration<JarEntry> entries = this.entries();
         //no cleaner way to do this without asking for the group and artifact id, which defeats the point
@@ -27,8 +29,13 @@ private Properties mavenProperties = new Properties();
             JarEntry entry = entries.nextElement();
             if (entry.getName().contains("pom.properties")) {
                 mavenProperties.load(this.getInputStream(entry));
+                break;
             }
         }
+    }
+    
+    public MavenJarFile(File aJarFile) throws IOException{
+        this(aJarFile.toURI());
     }
     
     public String getArtifactId(){

@@ -1,0 +1,24 @@
+/*
+ * To change this template, choose Tools | Templates
+ * and open the template in the editor.
+ */
+package com.compomics.coderepo.autoupdater;
+
+import java.io.File;
+import java.io.FilenameFilter;
+
+/**
+ *
+ * @author Davy
+ */
+public class JarFileFilter implements FilenameFilter {
+
+    @Override
+    public boolean accept(File dir, String name) {
+        boolean accept = false;
+        if (dir.getName().contains(name)) {
+            accept = true;
+        }
+        return accept;
+    }
+}
