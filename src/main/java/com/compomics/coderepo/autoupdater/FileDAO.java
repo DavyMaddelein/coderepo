@@ -31,7 +31,7 @@ public class FileDAO {
         compomicsArtifactProperties.load(new FileReader(compomicsArtifactPropertiesFile));
         if (compomicsArtifactProperties.getProperty("create_shortcut").equalsIgnoreCase(String.valueOf(JOptionPane.YES_OPTION))) {
             //steal code from peptideshaker
-        } else if (compomicsArtifactProperties.getProperty("create_shortcut").equalsIgnoreCase(String.valueOf(JOptionPane.CANCEL_OPTION))) {
+        } else if (compomicsArtifactProperties.getProperty("create_shortcut").equalsIgnoreCase(String.valueOf(JOptionPane.CANCEL_OPTION)) || compomicsArtifactProperties.getProperty("create_shortcut").equalsIgnoreCase(String.valueOf(JOptionPane.CLOSED_OPTION))) {
             Object[] options = new Object[]{"yes", "no", "ask me next update"};
             boolean rememberOption = false;
             int selection = JOptionPane.showOptionDialog(null, "do you want to create a desktop shortcut?", "shortcut", JOptionPane.YES_NO_CANCEL_OPTION, JOptionPane.QUESTION_MESSAGE, null, options, JOptionPane.CANCEL_OPTION);
