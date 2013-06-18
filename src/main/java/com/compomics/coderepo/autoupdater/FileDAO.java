@@ -27,9 +27,20 @@ public class FileDAO {
 
     public static void createDesktopShortcut(MavenJarFile file) throws IOException {
         Properties compomicsArtifactProperties = new Properties();
-        compomicsArtifactProperties.load(new FileReader(new File(new StringBuilder().append(System.getProperty("Users.home")).append("/.compomics/").append(file.getArtifactId()).append("updatesettings.properties").toString())));
-        if (compomicsArtifactProperties.getProperty("create_shortcut").equalsIgnoreCase("yes")) {
-            FileDAO.createDesktopShortcut(file);
+        File compomicsArtifactPropertiesFile = new File(new StringBuilder().append(System.getProperty("Users.home")).append("/.compomics/").append(file.getArtifactId()).append("updatesettings.properties").toString());
+        compomicsArtifactProperties.load(new FileReader(compomicsArtifactPropertiesFile));
+        if (compomicsArtifactProperties.getProperty("create_shortcut").equalsIgnoreCase(String.valueOf(JOptionPane.YES_OPTION))) {
+            //steal code from peptideshaker
+        } else if (compomicsArtifactProperties.getProperty("create_shortcut").equalsIgnoreCase(String.valueOf(JOptionPane.CANCEL_OPTION))) {
+            Object[] options = new Object[]{"yes", "no", "ask me next update"};
+            boolean rememberOption = false;
+            int selection = JOptionPane.showOptionDialog(null, "do you want to create a desktop shortcut?", "shortcut", JOptionPane.YES_NO_CANCEL_OPTION, JOptionPane.QUESTION_MESSAGE, null, options, JOptionPane.CANCEL_OPTION);
+            //also check to remember choice
+            if (selection == JOptionPane.YES_OPTION) {
+            } else if (selection == JOptionPane.CANCEL_OPTION || selection == JOptionPane.CLOSED_OPTION || rememberOption) {
+                compomicsArtifactProperties.setProperty("create_shortcut", String.valueOf(selection));
+                compomicsArtifactProperties.store(new FileOutputStream(compomicsArtifactPropertiesFile), null);
+            }
         }
     }
 
@@ -101,8 +112,8 @@ public class FileDAO {
         BufferedReader buf = new BufferedReader(new InputStreamReader(tarStream));
         ArchiveEntry entry;
         while ((entry = tarStream.getNextEntry()) != null) {
-           FileOutputStream out =  new FileOutputStream(untarLocation+"/"+entry.getName());
-        
+            FileOutputStream out = new FileOutputStream(untarLocation + "/" + entry.getName());
+
         }
 
         return fileUntarred;
