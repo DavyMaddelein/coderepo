@@ -14,6 +14,7 @@ import java.net.URL;
 import java.util.Properties;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.ZipInputStream;
+import javax.swing.JFileChooser;
 import javax.swing.JOptionPane;
 import javax.xml.stream.XMLStreamException;
 import org.apache.commons.compress.archivers.ArchiveEntry;
@@ -51,10 +52,18 @@ public class FileDAO {
         }
         if (file == null) {
             Object[] options = {"yes...", "specify other location...", "quit"};
-            Object choice = JOptionPane.showInputDialog(null, "there has been a problem with finding the location of the original file\n Do you want to download the latest update to your home folder or specify another location?", "Input", JOptionPane.INFORMATION_MESSAGE, null, options, options[0]);
-            //if (choice == JOptionPane.YES_OPTION) {
-            file = new File(System.getProperty("users.home"));
-            //} else if (choice == JOptionPane_NO_option){JFilechooser fileChooser = new JFileChooser(System.getProperty("users.home"),JFileChooser.FOLDER);file = fileChooser.getFile()}
+            int choice = JOptionPane.showOptionDialog(null, "there has been a problem with finding the location of the original file\n Do you want to download the latest update to your home folder or specify another location?", "specify download location", JOptionPane.YES_NO_CANCEL_OPTION, JOptionPane.QUESTION_MESSAGE, null, options, JOptionPane.CANCEL_OPTION);
+            if (choice == JOptionPane.YES_OPTION) {
+                file = new File(System.getProperty("users.home"));
+            } else if (choice == JOptionPane.NO_OPTION) {
+                JFileChooser fileChooser = new JFileChooser(System.getProperty("users.home"));
+                fileChooser.setMultiSelectionEnabled(false);
+                fileChooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+                fileChooser.setVisible(true);
+                file = fileChooser.getSelectedFile();
+            } else if (choice == JOptionPane.CANCEL_OPTION || choice ==  JOptionPane.CLOSED_OPTION){
+            
+            }
         }
         return file;
     }
@@ -109,16 +118,20 @@ public class FileDAO {
         boolean fileUntarred = false;
         String untarLocation = fileToUntar.getAbsolutePath();
         TarArchiveInputStream tarStream = new TarArchiveInputStream(new FileInputStream(fileToUntar));
-        BufferedReader buf = new BufferedReader(new InputStreamReader(tarStream));
+        BufferedReader bufferedTarReader = new BufferedReader(new InputStreamReader(tarStream));
         ArchiveEntry entry;
         while ((entry = tarStream.getNextEntry()) != null) {
             char[] cbuf = new char[1024];
             int count;
             FileWriter out = new FileWriter(new File(untarLocation + "/" + entry.getName()));
-            while ((count = buf.read(cbuf, 0, 1024)) != -1) {
+            while ((count = bufferedTarReader.read(cbuf, 0, 1024)) != -1) {
                 out.write(cbuf, 0, count);
             }
+            out.flush();
+            out.close();
         }
+        bufferedTarReader.close();
+        tarStream.close();
         return fileUntarred;
     }
 
