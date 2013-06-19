@@ -71,7 +71,7 @@ public class FileDAO {
 
     //rewrite both downloadAndUnzipFiles to use apache commons compress library?
     public static File downloadAndUnzipFile(ZipInputStream in, File fileLocationOnDiskToDownloadTo) throws IOException {
-        BufferedWriter dest = null;
+        BufferedWriter dest;
         InputStreamReader isr = new InputStreamReader(in);
         while (in.getNextEntry() != null) {
             int count;
@@ -112,10 +112,13 @@ public class FileDAO {
         BufferedReader buf = new BufferedReader(new InputStreamReader(tarStream));
         ArchiveEntry entry;
         while ((entry = tarStream.getNextEntry()) != null) {
-            FileOutputStream out = new FileOutputStream(untarLocation + "/" + entry.getName());
-
+            char[] cbuf = new char[1024];
+            int count;
+            FileWriter out = new FileWriter(new File(untarLocation + "/" + entry.getName()));
+            while ((count = buf.read(cbuf, 0, 1024)) != -1) {
+                out.write(cbuf, 0, count);
+            }
         }
-
         return fileUntarred;
     }
 
