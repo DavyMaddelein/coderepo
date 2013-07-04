@@ -18,18 +18,18 @@ public class CompareVersionNumbers implements Comparator<String> {
         int compareInt = -1;
         Scanner a = (new Scanner(oldVersionNumber)).useDelimiter("\\.");
         Scanner b = (new Scanner(newVersionNumber)).useDelimiter("\\.");
-        int i = 0, j = 0;
+        int oldversionnumber = 0, newversionnumber = 0;
         if (!newVersionNumber.contains("b") || !newVersionNumber.contains("beta")) {
             while (a.hasNext() && b.hasNext()) {
-                i = Integer.parseInt(a.next());
-                j = Integer.parseInt(b.next());
-                if (j > i) {
+                oldversionnumber = Integer.parseInt(a.next());
+                newversionnumber = Integer.parseInt(b.next());
+                if (newversionnumber > oldversionnumber) {
                     compareInt = 1;
                 }
             }
             if (b.hasNext() && !a.hasNext()) {
                 compareInt = 1;
-            } else if (!b.hasNext() && !a.hasNext() && i == j) {
+            } else if (!b.hasNext() && !a.hasNext() && oldversionnumber == newversionnumber) {
                 compareInt = 0;
             }
         }

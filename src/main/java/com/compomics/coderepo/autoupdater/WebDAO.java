@@ -1,7 +1,3 @@
-/*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
- */
 package com.compomics.coderepo.autoupdater;
 
 import java.io.BufferedReader;
@@ -41,7 +37,7 @@ public class WebDAO {
                 Iterator<Attribute> attributes = htmlTag.asStartElement().getAttributes();
                 while (attributes.hasNext()) {
                     attribute = attributes.next();
-                    if (attribute.getName().getLocalPart().equalsIgnoreCase("href") && attribute.getValue().contains(suffix)) {
+                    if (attribute.getName().getLocalPart().equalsIgnoreCase("href") && attribute.getValue().toLowerCase().contains(suffix)) {
                         toReturn = attribute.getValue();
                         break;
                     }

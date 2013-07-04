@@ -40,7 +40,7 @@ public class DownloadLatestZipFromRepo {
         if (FileDAO.NewVersionReleased(mavenJarFile)) {
             URL repoURL = new URL("http", "genesis.ugent.be", new StringBuilder().append("/maven2/").append(mavenJarFile.getGroupId()).append("/").append(latestRemoteRelease).toString());
             File downloadedFile;
-            if (System.getProperty("os.name").contains("windows")) {
+            if (System.getProperty("os.name").toLowerCase().contains("windows")) {
                 URL archiveURL = WebDAO.getUrlOfZippedVersion(repoURL, ".zip");
                 downloadedFile = FileDAO.downloadAndUnzipFile(new ZipInputStream(new BufferedInputStream(archiveURL.openStream())), new File(FileDAO.getLocationToDownloadOnDisk(jarPath.getPath()), archiveURL.getFile()));
                 try {
