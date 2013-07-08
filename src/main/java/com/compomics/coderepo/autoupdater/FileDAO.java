@@ -26,23 +26,47 @@ import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
  */
 public class FileDAO {
 
-    public static void createDesktopShortcut(MavenJarFile file) throws IOException {
+    /**
+     * creates a new Desktop Shortcut to the maven jar file
+     *
+     * @param file the maven jarfile to make a shortcut to
+     * @param deleteOldShortcut if previous shortcuts containing the maven jar
+     * file artifact id should be removed
+     * @throws IOException
+     */
+    public static boolean createDesktopShortcut(MavenJarFile file, boolean deleteOldShortcut) throws IOException {
         Properties compomicsArtifactProperties = new Properties();
         File compomicsArtifactPropertiesFile = new File(new StringBuilder().append(System.getProperty("Users.home")).append("/.compomics/").append(file.getArtifactId()).append("updatesettings.properties").toString());
         compomicsArtifactProperties.load(new FileReader(compomicsArtifactPropertiesFile));
-        if (compomicsArtifactProperties.getProperty("create_shortcut").equalsIgnoreCase(String.valueOf(JOptionPane.YES_OPTION))) {
-            //steal code from peptideshaker
-        } else if (compomicsArtifactProperties.getProperty("create_shortcut").equalsIgnoreCase(String.valueOf(JOptionPane.CANCEL_OPTION)) || compomicsArtifactProperties.getProperty("create_shortcut").equalsIgnoreCase(String.valueOf(JOptionPane.CLOSED_OPTION))) {
+        int selection;
+        if (!compomicsArtifactProperties.contains("create_shortcut")) {
             Object[] options = new Object[]{"yes", "no", "ask me next update"};
             boolean rememberOption = false;
-            int selection = JOptionPane.showOptionDialog(null, "do you want to create a desktop shortcut?", "shortcut", JOptionPane.YES_NO_CANCEL_OPTION, JOptionPane.QUESTION_MESSAGE, null, options, JOptionPane.CANCEL_OPTION);
-            //also check to remember choice
-            if (selection == JOptionPane.YES_OPTION) {
-            } else if (selection == JOptionPane.CANCEL_OPTION || selection == JOptionPane.CLOSED_OPTION || rememberOption) {
+            selection = JOptionPane.showOptionDialog(null, "do you want to create a desktop shortcut?", "shortcut", JOptionPane.YES_NO_CANCEL_OPTION, JOptionPane.QUESTION_MESSAGE, null, options, JOptionPane.CANCEL_OPTION);
+            //also check (as in add checkbox) to remember choice
+            if (selection == JOptionPane.CANCEL_OPTION || selection == JOptionPane.CLOSED_OPTION || rememberOption) {
                 compomicsArtifactProperties.setProperty("create_shortcut", String.valueOf(selection));
                 compomicsArtifactProperties.store(new FileOutputStream(compomicsArtifactPropertiesFile), null);
             }
         }
+        try {
+            selection = Integer.parseInt(compomicsArtifactProperties.getProperty("create_shortcut"));
+            if (selection == JOptionPane.YES_OPTION) {
+            }
+            if (deleteOldShortcut) {
+                for (String fileName : new File(System.getProperty("User.home")).list()) {
+                }
+
+            }
+        } catch (NullPointerException npe) {
+            throw new IOException("could not create the shortcut");
+        } catch (NumberFormatException nfe) {
+            throw new IOException("could not create the shortcut");
+        }
+
+
+
+        return true;
     }
 
     public static File getLocationToDownloadOnDisk(String targetDownloadFolder) {
@@ -61,8 +85,7 @@ public class FileDAO {
                 fileChooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
                 fileChooser.setVisible(true);
                 file = fileChooser.getSelectedFile();
-            } else if (choice == JOptionPane.CANCEL_OPTION || choice ==  JOptionPane.CLOSED_OPTION){
-            
+            } else if (choice == JOptionPane.CANCEL_OPTION || choice == JOptionPane.CLOSED_OPTION) {
             }
         }
         return file;

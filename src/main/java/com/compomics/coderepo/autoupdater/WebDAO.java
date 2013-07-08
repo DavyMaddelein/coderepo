@@ -24,12 +24,26 @@ public class WebDAO {
         return xmlParser.getHighestVersionNumber();
     }
 
-    public static URL getUrlOfZippedVersion(URL repoURL, String suffix) throws MalformedURLException, IOException, XMLStreamException {
+    /**
+     * gets the first zip file from an url, in case of a maven repo deploy this
+     * should be the only zip in the folder
+     *
+     * @param repoURL the URL to get the zip from
+     * @param suffix what file extension should be looked for
+     * @param returnAlternateArchives if the requested file extension isn't
+     * found, return the first .zip/tar.gz found
+     * @return URL to the archive file
+     * @throws MalformedURLException
+     * @throws IOException
+     * @throws XMLStreamException
+     */
+    public static URL getUrlOfZippedVersion(URL repoURL, String suffix, boolean returnAlternateArchives) throws MalformedURLException, IOException, XMLStreamException,NullPointerException {
         XMLInputFactory xmlParseFactory = XMLInputFactory.newInstance();
         XMLEventReader xmlReader = xmlParseFactory.createXMLEventReader(repoURL.openStream());
-
+//probably cleaner with dom parser or jaxb
         XMLEvent htmlTag;
         String toReturn = null;
+        String alternativeReturn = null;
         Attribute attribute;
         while (xmlReader.hasNext()) {
             htmlTag = xmlReader.nextEvent();
@@ -37,12 +51,17 @@ public class WebDAO {
                 Iterator<Attribute> attributes = htmlTag.asStartElement().getAttributes();
                 while (attributes.hasNext()) {
                     attribute = attributes.next();
+                    toReturn = attribute.getValue();
                     if (attribute.getName().getLocalPart().equalsIgnoreCase("href") && attribute.getValue().toLowerCase().contains(suffix)) {
-                        toReturn = attribute.getValue();
                         break;
+                    } else if (toReturn.contains(".zip") || toReturn.contains(".tar.gz") || toReturn.contains(".bz") && returnAlternateArchives) {
+                        alternativeReturn = toReturn;
                     }
                 }
             }
+        }
+        if (returnAlternateArchives && toReturn == null) {
+            toReturn = alternativeReturn;
         }
         return new URL(toReturn);
     }

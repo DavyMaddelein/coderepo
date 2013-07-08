@@ -9,19 +9,12 @@ import java.net.URL;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.ZipInputStream;
 import javax.xml.stream.XMLStreamException;
+
 /**
  *
  * @author Davy
  */
-
-
 public class DownloadLatestZipFromRepo {
-
-    private String latestRemoteRelease;
-
-    public static void main(String[] args) throws MalformedURLException, IOException, XMLStreamException, URISyntaxException {
-        new DownloadLatestZipFromRepo(new File("C:\\Users\\Davy\\Desktop\\java\\thermo-msf-parser\\thermo_msf_parser_GUI\\target\\thermo_msf_parser_GUI-2.0.4\\thermo_msf_parser_GUI-2.0.4.jar").toURL(), false, new String[]{""});
-    }
 
     /**
      *
@@ -35,31 +28,48 @@ public class DownloadLatestZipFromRepo {
      * @throws XMLStreamException if there was a problem reading the meta data
      * from the remote maven repository
      */
-    public DownloadLatestZipFromRepo(URL jarPath, boolean deleteOldFiles, String[] args) throws IOException, XMLStreamException, URISyntaxException {
+    public static void downloadLatestZipFromRepo(URL jarPath, boolean deleteOldFiles, String[] args) throws IOException, XMLStreamException, URISyntaxException {
+        MavenJarFile mavenJarFile = new MavenJarFile(jarPath.toURI());
+        downloadLatestZipFromRepo(jarPath, deleteOldFiles, args, new URL("http", "genesis.ugent.be", new StringBuilder().append("/maven2/").append(mavenJarFile.getGroupId()).append("/").toString()));
+        //echo $javahome?
+    }
+
+    public static void downloadLatestZipFromRepo(URL jarPath, boolean deleteOldFiles, String[] args, URL jarRepository) throws IOException, XMLStreamException, URISyntaxException {
         MavenJarFile mavenJarFile = new MavenJarFile(jarPath.toURI());
         if (FileDAO.NewVersionReleased(mavenJarFile)) {
-            URL repoURL = new URL("http", "genesis.ugent.be", new StringBuilder().append("/maven2/").append(mavenJarFile.getGroupId()).append("/").append(latestRemoteRelease).toString());
-            File downloadedFile;
+            File downloadedFile = null;
             if (System.getProperty("os.name").toLowerCase().contains("windows")) {
-                URL archiveURL = WebDAO.getUrlOfZippedVersion(repoURL, ".zip");
+                URL archiveURL = WebDAO.getUrlOfZippedVersion(jarRepository, ".zip", false);
                 downloadedFile = FileDAO.downloadAndUnzipFile(new ZipInputStream(new BufferedInputStream(archiveURL.openStream())), new File(FileDAO.getLocationToDownloadOnDisk(jarPath.getPath()), archiveURL.getFile()));
                 try {
-                    MavenJarFile newJar = FileDAO.getMavenJarFileFromFolderWithArtifactId(downloadedFile,mavenJarFile.getArtifactId());
-                    FileDAO.createDesktopShortcut(newJar);
+                    MavenJarFile newJar = FileDAO.getMavenJarFileFromFolderWithArtifactId(downloadedFile, mavenJarFile.getArtifactId());
+                    FileDAO.createDesktopShortcut(newJar,deleteOldFiles);
                 } catch (IOException ioex) {
                     handleSilently(ioex);
                 }
             } else {
-                URL archiveURL = WebDAO.getUrlOfZippedVersion(repoURL, ".tar.gz");
-                downloadedFile = FileDAO.downloadAndUnzipFile(new GZIPInputStream(archiveURL.openStream()), new File(FileDAO.getLocationToDownloadOnDisk(jarPath.getPath()), archiveURL.getFile()));
+                URL archiveURL = WebDAO.getUrlOfZippedVersion(jarRepository, ".tar.gz", true);
+                if (archiveURL != null) {
+                    downloadedFile = FileDAO.downloadAndUnzipFile(new GZIPInputStream(archiveURL.openStream()), new File(FileDAO.getLocationToDownloadOnDisk(jarPath.getPath()), archiveURL.getFile()));
+                }
                 //update symlinks?
             }
-            
+            StringBuilder builder = new StringBuilder();
+            builder.append("java -jar ");
+            try {
+                builder.append(downloadedFile.getAbsolutePath());
+                ProcessBuilder p = new ProcessBuilder();
+                p.start();
+            } catch (NullPointerException npe) {
+                throw new IOException("could not start the jar");
+            }
+            if (deleteOldFiles) {
+                
+            }
         }
-        //echo $javahome?
     }
 
-    private void handleSilently(Exception ex) {
+    private static void handleSilently(Exception ex) {
         throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
     }
 }
