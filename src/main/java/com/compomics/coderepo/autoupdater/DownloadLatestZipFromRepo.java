@@ -20,19 +20,55 @@ import org.apache.commons.io.FileUtils;
 public class DownloadLatestZipFromRepo {
 
     /**
+     * downloads the latest deploy from the genesis maven repository of the
+     * artifact of the jarPath,starts it without arguments and removes the old
+     * jar if there was an update
+     *
+     * @param jarPath the path to the jarfile
+     * @throws IOException should there be problems with reading or writing
+     * files during the updating
+     * @throws XMLStreamException if there was a problem reading the meta data
+     * from the remote maven repository
+     * @throws URISyntaxException
+     */
+    public static void downloadLatestZipFromRepo(URL jarPath) throws IOException, XMLStreamException, URISyntaxException {
+        downloadLatestZipFromRepo(jarPath, true, true);
+    }
+
+    /**
+     * downloads the latest deploy from the genesis maven repository of the
+     * artifact and starts it without arguments
+     *
+     * @param jarPath the path to the jarfile
+     * @param deleteOldFiles if the jar who starts the update should be deleted
+     * @param startDownloadedVersion if the newly downloaded jar should be
+     * started after download
+     * @throws IOException should there be problems with reading or writing
+     * files during the updating
+     * @throws XMLStreamException if there was a problem reading the meta data
+     * from the remote maven repository
+     * @throws URISyntaxException
+     */
+    public static void downloadLatestZipFromRepo(URL jarPath, boolean deleteOldFiles, boolean startDownloadedVersion) throws IOException, XMLStreamException, URISyntaxException {
+        downloadLatestZipFromRepo(jarPath, deleteOldFiles, new String[0], startDownloadedVersion);
+    }
+
+    /**
      * downloads the latest zip archive of the jar in the url from the genesis
      * maven repo
      *
      * @param jarPath the path to the jarfile to update
      * @param deleteOldFiles if the original jar file should be deleted
      * @param args the args for the newly downloaded jar when it starts
-     * @throws IOException
-     * @throws XMLStreamException
+     * @throws IOException should there be problems with reading or writing
+     * files during the updating
+     * @throws XMLStreamException if there was a problem reading the meta data
+     * from the remote maven repository
      * @throws URISyntaxException
      */
-    public static void downloadLatestZipFromRepo(URL jarPath, boolean deleteOldFiles, String[] args) throws IOException, XMLStreamException, URISyntaxException {
+    public static void downloadLatestZipFromRepo(URL jarPath, boolean deleteOldFiles, String[] args, boolean startDownloadedVersion) throws IOException, XMLStreamException, URISyntaxException {
         MavenJarFile mavenJarFile = new MavenJarFile(jarPath.toURI());
-        downloadLatestZipFromRepo(jarPath, deleteOldFiles, null, args, new URL("http", "genesis.ugent.be", new StringBuilder().append("/maven2/").append(mavenJarFile.getGroupId()).append("/").toString()), true);
+        downloadLatestZipFromRepo(jarPath, deleteOldFiles, null, args, new URL("http", "genesis.ugent.be", new StringBuilder().append("/maven2/").append(mavenJarFile.getGroupId()).append("/").toString()), startDownloadedVersion);
         //echo $javahome?
     }
 
@@ -40,13 +76,16 @@ public class DownloadLatestZipFromRepo {
      * downloads the latest zip archive of the jar in the url from a given
      * jarRepository
      *
-     * @param jarPath the path to the jarfile to update
-     * @param deleteOldFiles if the original jar folder should be deleted
+     * @param jarPath the path to the jarfile to update, cannot be {@code null}
+     * @param deleteOldFiles if the original jar folder should be deleted,
+     * cannot be {@code null}
      * @param args the args for the newly downloaded jar when it starts
      * @param jarRepository the repository to look for the latest deploy of the
-     * jar file
-     * @throws IOException
-     * @throws XMLStreamException
+     * jar file, cannot be {@code null}
+     * @throws IOException should there be problems with reading or writing
+     * files during the updating
+     * @throws XMLStreamException if there was a problem reading the meta data
+     * from the remote maven repository
      * @throws URISyntaxException
      */
     public static void downloadLatestZipFromRepo(URL jarPath, boolean deleteOldFiles, String[] args, URL jarRepository) throws IOException, XMLStreamException, URISyntaxException {
@@ -61,8 +100,9 @@ public class DownloadLatestZipFromRepo {
      * @param deleteOldFiles should the old installation be removed or not
      * cannot be {@code null}
      * @param args the args that will be passed to the newly downloaded program
-     * when started
-     * @param jarRepository
+     * when started, cannot be {@code null}
+     * @param jarRepository the maven repository to go look in, cannot be
+     * {@code null}
      * @param startDownloadedVersion if the newly downloaded version should be
      * started automatically or not
      * @throws IOException should there be problems with reading or writing
@@ -71,7 +111,7 @@ public class DownloadLatestZipFromRepo {
      * from the remote maven repository
      * @throws URISyntaxException
      */
-    public static void downloadLatestZipFromRepo(URL jarPath, boolean deleteOldFiles, String iconName, String[] args, URL jarRepository, boolean startDownloadedVersion) throws IOException, XMLStreamException, URISyntaxException {
+    public static void downloadLatestZipFromRepo(final URL jarPath, boolean deleteOldFiles, String iconName, String[] args, URL jarRepository, boolean startDownloadedVersion) throws IOException, XMLStreamException, URISyntaxException {
         MavenJarFile mavenJarFile = new MavenJarFile(jarPath.toURI());
         if (FileDAO.NewVersionReleased(mavenJarFile)) {
             File downloadedFile = null;
@@ -91,10 +131,28 @@ public class DownloadLatestZipFromRepo {
                 }
                 //update symlinks?
             }
-            launchJar(downloadedFile, args);
+            try {
+                launchJar(downloadedFile, args);
+                if (deleteOldFiles) {
+                    Runtime.getRuntime().addShutdownHook(new Thread() {
+                        @Override
+                        public void run() {
+                            try {
+                                File jarParent = new File(jarPath.toURI()).getParentFile();
+                                if (jarParent.exists()) {
+                                    FileUtils.deleteDirectory(jarParent);
+                                }
+                            } catch (URISyntaxException ex) {
+                                //todo handle file location does not exist
+                            } catch (IOException ex) {
+                                //todo handle old files could not be downloaded
+                            }
+                        }
+                    });
 
-            if (deleteOldFiles) {
-                FileUtils.deleteDirectory(new File(jarPath.toURI()).getParentFile());
+                }
+            } catch (IOException ioe) {
+                throw new IOException("could not start the downloaded jar, old files have not been deleted");
             }
         }
     }
@@ -103,7 +161,15 @@ public class DownloadLatestZipFromRepo {
         throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
     }
 
-    private static boolean launchJar(File downloadedFile, String[] args) throws IOException {
+    /**
+     * simple jar launch through a {@code processBuilder}
+     * 
+     * @param downloadedFile the downloaded jar file to start
+     * @param args the args to give to the jar file
+     * @return true if the launch succeeded
+     * @throws IOException if the process could not start
+     */
+    private static boolean launchJar(File downloadedFile, String[] args) throws NullPointerException, IOException {
 
         List<String> processToRun = new ArrayList<String>();
         try {
