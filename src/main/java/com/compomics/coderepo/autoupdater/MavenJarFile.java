@@ -19,9 +19,11 @@ import java.util.jar.JarFile;
 public class MavenJarFile extends JarFile {
 
 private Properties mavenProperties = new Properties();
+private String absoluteFilePath;
     
     public MavenJarFile(URI jarPath) throws IOException {
         super(jarPath.getPath());
+        this.absoluteFilePath = jarPath.getPath();
         Enumeration<JarEntry> entries = this.entries();
         //no cleaner way to do this without asking for the group and artifact id, which defeats the point
         while (entries.hasMoreElements()) {
@@ -47,5 +49,9 @@ private Properties mavenProperties = new Properties();
     
     public String getVersionNumber(){
         return mavenProperties.getProperty("versionNumber");
+    }
+
+    public String getAbsoluteFilePath() {
+        return absoluteFilePath;
     }
 }

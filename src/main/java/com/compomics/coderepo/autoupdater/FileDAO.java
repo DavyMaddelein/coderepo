@@ -17,6 +17,7 @@ import java.util.zip.ZipInputStream;
 import javax.swing.JFileChooser;
 import javax.swing.JOptionPane;
 import javax.xml.stream.XMLStreamException;
+import net.jimmc.jshortcut.JShellLink;
 import org.apache.commons.compress.archivers.ArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 
@@ -30,11 +31,12 @@ public class FileDAO {
      * creates a new Desktop Shortcut to the maven jar file
      *
      * @param file the maven jarfile to make a shortcut to
+     * @param iconName the name of the icon file in the resources folder
      * @param deleteOldShortcut if previous shortcuts containing the maven jar
      * file artifact id should be removed
      * @throws IOException
      */
-    public static boolean createDesktopShortcut(MavenJarFile file, boolean deleteOldShortcut) throws IOException {
+    public static boolean createDesktopShortcut(MavenJarFile file, String iconName, boolean deleteOldShortcut) throws IOException {
         Properties compomicsArtifactProperties = new Properties();
         File compomicsArtifactPropertiesFile = new File(new StringBuilder().append(System.getProperty("Users.home")).append("/.compomics/").append(file.getArtifactId()).append("updatesettings.properties").toString());
         compomicsArtifactProperties.load(new FileReader(compomicsArtifactPropertiesFile));
@@ -52,6 +54,7 @@ public class FileDAO {
         try {
             selection = Integer.parseInt(compomicsArtifactProperties.getProperty("create_shortcut"));
             if (selection == JOptionPane.YES_OPTION) {
+                addShortcutAtDeskTop(file, iconName);
             }
             if (deleteOldShortcut) {
                 for (String fileName : new File(System.getProperty("User.home")).list()) {
@@ -63,13 +66,26 @@ public class FileDAO {
         } catch (NumberFormatException nfe) {
             throw new IOException("could not create the shortcut");
         }
-
-
-
         return true;
     }
 
-    public static File getLocationToDownloadOnDisk(String targetDownloadFolder) {
+    public static void addShortcutAtDeskTop(MavenJarFile mavenJarFile) {
+        addShortcutAtDeskTop(mavenJarFile, null);
+    }
+
+    public static void addShortcutAtDeskTop(MavenJarFile mavenJarFile, String iconName) {
+
+        JShellLink link = new JShellLink();
+        link.setFolder(JShellLink.getDirectory("desktop"));
+        link.setName(new StringBuilder().append(mavenJarFile.getArtifactId()).append("-").append(mavenJarFile.getVersionNumber()).toString());
+        if (iconName != null) {
+            link.setIconLocation(mavenJarFile.getAbsoluteFilePath() + "/resources/" + iconName);
+        }
+        link.setPath(mavenJarFile.getAbsoluteFilePath());
+        link.save();
+    }
+
+    public static File getLocationToDownloadOnDisk(String targetDownloadFolder) throws IOException {
         File file = new File(targetDownloadFolder);
         if (file.exists() && !file.isDirectory()) {
             file = file.getParentFile();
@@ -86,6 +102,7 @@ public class FileDAO {
                 fileChooser.setVisible(true);
                 file = fileChooser.getSelectedFile();
             } else if (choice == JOptionPane.CANCEL_OPTION || choice == JOptionPane.CLOSED_OPTION) {
+                throw new IOException("no download location");
             }
         }
         return file;

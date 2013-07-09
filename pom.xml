@@ -107,6 +107,12 @@
             <version>5.1.21</version>
             <type>jar</type>
         </dependency>
+        <dependency>
+            <groupId>net.jimmc</groupId>
+            <artifactId>jshortcut</artifactId>
+            <version>0.4-oberzalek</version>
+            <type>jar</type>
+        </dependency>
     </dependencies>
     
     
