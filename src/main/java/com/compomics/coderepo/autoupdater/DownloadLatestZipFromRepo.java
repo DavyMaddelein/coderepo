@@ -118,7 +118,7 @@ public class DownloadLatestZipFromRepo {
         if (FileDAO.NewVersionReleased(oldMavenJarFile)) {
             MavenJarFile downloadedJarFile = null;
             if (System.getProperty("os.name").toLowerCase().contains("win")) {
-                downloadedJarFile = downloadAndUnzipJarForWindows(oldMavenJarFile, iconName, jarRepository);
+                downloadedJarFile = downloadAndUnzipJarForWindows(oldMavenJarFile, jarRepository);
                 FileDAO.createDesktopShortcut(downloadedJarFile, iconName, deleteOldFiles);
             } else {
                 downloadedJarFile = downloadAndUnzipJarForUnix(oldMavenJarFile, jarRepository);
@@ -134,10 +134,8 @@ public class DownloadLatestZipFromRepo {
                                 if (jarParent.exists()) {
                                     FileUtils.deleteDirectory(jarParent);
                                 }
-                            } catch (URISyntaxException ex) {
-                                //todo handle file location does not exist
-                            } catch (IOException ex) {
-                                //todo handle old files could not be downloaded
+                            } catch ( URISyntaxException | IOException ex) {
+                                //todo handle stuff did not get done
                             }
                         }
                     });
@@ -176,24 +174,29 @@ public class DownloadLatestZipFromRepo {
         return true;
     }
 
-    private static MavenJarFile downloadAndUnzipJarForWindows(MavenJarFile mavenJarFile, String iconName, URL jarRepository) throws MalformedURLException, IOException, XMLStreamException {
-        File downloadedFile;
+    private static MavenJarFile downloadAndUnzipJarForWindows(MavenJarFile mavenJarFile, URL jarRepository) throws MalformedURLException, IOException, XMLStreamException {
         MavenJarFile newMavenJar = null;
         URL archiveURL = WebDAO.getUrlOfZippedVersion(jarRepository, ".zip", false);
-        downloadedFile = FileDAO.downloadAndUnzipFile(new ZipInputStream(new BufferedInputStream(archiveURL.openStream())), new File(FileDAO.getLocationToDownloadOnDisk(mavenJarFile.getAbsoluteFilePath()), archiveURL.getFile()));
         try {
-            newMavenJar = FileDAO.getMavenJarFileFromFolderWithArtifactId(downloadedFile, mavenJarFile.getArtifactId());
+            newMavenJar = FileDAO.getMavenJarFileFromFolderWithArtifactId(FileDAO.downloadAndUnzipFile(new ZipInputStream(new BufferedInputStream(archiveURL.openStream())), new File(FileDAO.getLocationToDownloadOnDisk(mavenJarFile.getAbsoluteFilePath()), archiveURL.getFile())), mavenJarFile.getArtifactId());
         } catch (IOException ioex) {
             handleSilently(ioex);
         }
         return newMavenJar;
     }
 
-    private static MavenJarFile downloadAndUnzipJarForUnix(MavenJarFile oldMavenJarFile ,URL jarRepository) throws MalformedURLException, IOException, XMLStreamException {
+    private static MavenJarFile downloadAndUnzipJarForUnix(MavenJarFile oldMavenJarFile, URL jarRepository) throws MalformedURLException, IOException, XMLStreamException {
         MavenJarFile downloadedJarFile = null;
         URL archiveURL = WebDAO.getUrlOfZippedVersion(jarRepository, ".tar.gz", true);
         if (archiveURL != null) {
-            downloadedJarFile = FileDAO.getMavenJarFileFromFolderWithArtifactId(FileDAO.downloadAndUnzipFile(new GZIPInputStream(archiveURL.openStream()), new File(FileDAO.getLocationToDownloadOnDisk(oldMavenJarFile.getAbsoluteFilePath()), archiveURL.getFile())),oldMavenJarFile.getArtifactId());
+            downloadedJarFile = FileDAO.getMavenJarFileFromFolderWithArtifactId(FileDAO.downloadAndUnzipFile(new GZIPInputStream(archiveURL.openStream()), new File(FileDAO.getLocationToDownloadOnDisk(oldMavenJarFile.getAbsoluteFilePath()), archiveURL.getFile())), oldMavenJarFile.getArtifactId());
+        } else {
+            archiveURL = WebDAO.getUrlOfZippedVersion(jarRepository, ".zip", true);
+            try {
+                downloadedJarFile = FileDAO.getMavenJarFileFromFolderWithArtifactId(FileDAO.downloadAndUnzipFile(new ZipInputStream(new BufferedInputStream(archiveURL.openStream())), new File(FileDAO.getLocationToDownloadOnDisk(oldMavenJarFile.getAbsoluteFilePath()), archiveURL.getFile())), oldMavenJarFile.getArtifactId());
+            } catch (IOException ioex) {
+                handleSilently(ioex);
+            }
         }
         return downloadedJarFile;
     }
