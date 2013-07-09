@@ -3,6 +3,7 @@ package com.compomics.coderepo.autoupdater;
 import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.IOException;
+import java.net.MalformedURLException;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.ArrayList;
@@ -99,6 +100,7 @@ public class DownloadLatestZipFromRepo {
      * updated on the file system. cannot be {@code null}
      * @param deleteOldFiles should the old installation be removed or not
      * cannot be {@code null}
+     * @param iconName name of the shortcut image should one be created
      * @param args the args that will be passed to the newly downloaded program
      * when started, cannot be {@code null}
      * @param jarRepository the maven repository to go look in, cannot be
@@ -112,28 +114,18 @@ public class DownloadLatestZipFromRepo {
      * @throws URISyntaxException
      */
     public static void downloadLatestZipFromRepo(final URL jarPath, boolean deleteOldFiles, String iconName, String[] args, URL jarRepository, boolean startDownloadedVersion) throws IOException, XMLStreamException, URISyntaxException {
-        MavenJarFile mavenJarFile = new MavenJarFile(jarPath.toURI());
-        if (FileDAO.NewVersionReleased(mavenJarFile)) {
-            File downloadedFile = null;
-            if (System.getProperty("os.name").toLowerCase().contains("windows")) {
-                URL archiveURL = WebDAO.getUrlOfZippedVersion(jarRepository, ".zip", false);
-                downloadedFile = FileDAO.downloadAndUnzipFile(new ZipInputStream(new BufferedInputStream(archiveURL.openStream())), new File(FileDAO.getLocationToDownloadOnDisk(jarPath.getPath()), archiveURL.getFile()));
-                try {
-                    MavenJarFile newJar = FileDAO.getMavenJarFileFromFolderWithArtifactId(downloadedFile, mavenJarFile.getArtifactId());
-                    FileDAO.createDesktopShortcut(newJar, iconName, deleteOldFiles);
-                } catch (IOException ioex) {
-                    handleSilently(ioex);
-                }
+        MavenJarFile oldMavenJarFile = new MavenJarFile(jarPath.toURI());
+        if (FileDAO.NewVersionReleased(oldMavenJarFile)) {
+            MavenJarFile downloadedJarFile = null;
+            if (System.getProperty("os.name").toLowerCase().contains("win")) {
+                downloadedJarFile = downloadAndUnzipJarForWindows(oldMavenJarFile, iconName, jarRepository);
+                FileDAO.createDesktopShortcut(downloadedJarFile, iconName, deleteOldFiles);
             } else {
-                URL archiveURL = WebDAO.getUrlOfZippedVersion(jarRepository, ".tar.gz", true);
-                if (archiveURL != null) {
-                    downloadedFile = FileDAO.downloadAndUnzipFile(new GZIPInputStream(archiveURL.openStream()), new File(FileDAO.getLocationToDownloadOnDisk(jarPath.getPath()), archiveURL.getFile()));
-                }
+                downloadedJarFile = downloadAndUnzipJarForUnix(oldMavenJarFile, jarRepository);
                 //update symlinks?
             }
             try {
-                launchJar(downloadedFile, args);
-                if (deleteOldFiles) {
+                if (launchJar(downloadedJarFile, args) && deleteOldFiles) {
                     Runtime.getRuntime().addShutdownHook(new Thread() {
                         @Override
                         public void run() {
@@ -163,18 +155,18 @@ public class DownloadLatestZipFromRepo {
 
     /**
      * simple jar launch through a {@code processBuilder}
-     * 
-     * @param downloadedFile the downloaded jar file to start
+     *
+     * @param downloadedJarFile the downloaded jar file to start
      * @param args the args to give to the jar file
      * @return true if the launch succeeded
      * @throws IOException if the process could not start
      */
-    private static boolean launchJar(File downloadedFile, String[] args) throws NullPointerException, IOException {
+    private static boolean launchJar(MavenJarFile downloadedFile, String[] args) throws NullPointerException, IOException {
 
         List<String> processToRun = new ArrayList<String>();
         try {
             processToRun.add("java -jar");
-            processToRun.add(downloadedFile.getAbsolutePath());
+            processToRun.add(downloadedFile.getAbsoluteFilePath());
             processToRun.addAll(Arrays.asList(args));
             ProcessBuilder p = new ProcessBuilder(processToRun);
             p.start();
@@ -182,5 +174,27 @@ public class DownloadLatestZipFromRepo {
             throw new IOException("could not start the jar");
         }
         return true;
+    }
+
+    private static MavenJarFile downloadAndUnzipJarForWindows(MavenJarFile mavenJarFile, String iconName, URL jarRepository) throws MalformedURLException, IOException, XMLStreamException {
+        File downloadedFile;
+        MavenJarFile newMavenJar = null;
+        URL archiveURL = WebDAO.getUrlOfZippedVersion(jarRepository, ".zip", false);
+        downloadedFile = FileDAO.downloadAndUnzipFile(new ZipInputStream(new BufferedInputStream(archiveURL.openStream())), new File(FileDAO.getLocationToDownloadOnDisk(mavenJarFile.getAbsoluteFilePath()), archiveURL.getFile()));
+        try {
+            newMavenJar = FileDAO.getMavenJarFileFromFolderWithArtifactId(downloadedFile, mavenJarFile.getArtifactId());
+        } catch (IOException ioex) {
+            handleSilently(ioex);
+        }
+        return newMavenJar;
+    }
+
+    private static MavenJarFile downloadAndUnzipJarForUnix(MavenJarFile oldMavenJarFile ,URL jarRepository) throws MalformedURLException, IOException, XMLStreamException {
+        MavenJarFile downloadedJarFile = null;
+        URL archiveURL = WebDAO.getUrlOfZippedVersion(jarRepository, ".tar.gz", true);
+        if (archiveURL != null) {
+            downloadedJarFile = FileDAO.getMavenJarFileFromFolderWithArtifactId(FileDAO.downloadAndUnzipFile(new GZIPInputStream(archiveURL.openStream()), new File(FileDAO.getLocationToDownloadOnDisk(oldMavenJarFile.getAbsoluteFilePath()), archiveURL.getFile())),oldMavenJarFile.getArtifactId());
+        }
+        return downloadedJarFile;
     }
 }
