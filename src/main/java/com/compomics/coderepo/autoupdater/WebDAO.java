@@ -2,14 +2,13 @@ package com.compomics.coderepo.autoupdater;
 
 import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.util.Iterator;
+import java.util.Locale;
 import javax.xml.stream.XMLEventReader;
 import javax.xml.stream.XMLInputFactory;
 import javax.xml.stream.XMLStreamException;
-import javax.xml.stream.events.Attribute;
-import javax.xml.stream.events.XMLEvent;
 
 /**
  *
@@ -17,7 +16,10 @@ import javax.xml.stream.events.XMLEvent;
  */
 public class WebDAO {
 
-    public static String getLatestVersionNumberFromRemoteRepo(BufferedReader remoteVersionsReader) throws XMLStreamException {
+    private static final Locale LOCALE = new Locale("en");
+    
+    public static String getLatestVersionNumberFromRemoteRepo(URL remoteVersionXMLFileLocation) throws XMLStreamException, IOException {
+        BufferedReader remoteVersionsReader = new BufferedReader(new InputStreamReader(remoteVersionXMLFileLocation.openStream()));
         XMLInputFactory xmlParseFactory = XMLInputFactory.newInstance();
         XMLEventReader xmlReader = xmlParseFactory.createXMLEventReader(remoteVersionsReader);
         MetaDataXMLParser xmlParser = new MetaDataXMLParser(xmlReader);
@@ -33,36 +35,36 @@ public class WebDAO {
      * @param returnAlternateArchives if the requested file extension isn't
      * found, return the first .zip/tar.gz found
      * @return URL to the archive file
-     * @throws MalformedURLException
-     * @throws IOException
-     * @throws XMLStreamException
+     * @throws MalformedURLException if the url of the zip could not be found
+     * @throws IOException if the stream to the webpage could not be read
      */
-    public static URL getUrlOfZippedVersion(URL repoURL, String suffix, boolean returnAlternateArchives) throws MalformedURLException, IOException, XMLStreamException,NullPointerException {
-        XMLInputFactory xmlParseFactory = XMLInputFactory.newInstance();
-        XMLEventReader xmlReader = xmlParseFactory.createXMLEventReader(repoURL.openStream());
-//probably cleaner with dom parser or jaxb
-        XMLEvent htmlTag;
+    public static URL getUrlOfZippedVersion(URL repoURL, String suffix, boolean returnAlternateArchives) throws MalformedURLException, IOException {
+        BufferedReader reader = new BufferedReader(new InputStreamReader(repoURL.openStream()));
+        suffix = suffix.trim();
+        String line;
         String toReturn = null;
         String alternativeReturn = null;
-        Attribute attribute;
-        while (xmlReader.hasNext()) {
-            htmlTag = xmlReader.nextEvent();
-            if (htmlTag.isStartElement()) {
-                Iterator<Attribute> attributes = htmlTag.asStartElement().getAttributes();
-                while (attributes.hasNext()) {
-                    attribute = attributes.next();
-                    toReturn = attribute.getValue();
-                    if (attribute.getName().getLocalPart().equalsIgnoreCase("href") && attribute.getValue().toLowerCase().contains(suffix)) {
-                        break;
-                    } else if (toReturn.contains(".zip") || toReturn.contains(".tar.gz") || toReturn.contains(".bz") && returnAlternateArchives) {
-                        alternativeReturn = toReturn;
-                    }
-                }
+        while ((line = reader.readLine()) != null) {
+            System.out.println(line);
+            if (line.toLowerCase(LOCALE).contains("href=") && line.toLowerCase(LOCALE).contains(suffix)) {
+                toReturn = line.substring(line.indexOf("href=\"") + 6,line.indexOf(suffix,line.indexOf("href=\""))+suffix.length());
+                break;
+            } else if (line.toLowerCase(LOCALE).contains(".zip") || line.toLowerCase(LOCALE).contains(".tar.gz") || line.toLowerCase(LOCALE).contains(".bz") && returnAlternateArchives) {
+                alternativeReturn = line.substring(line.indexOf("href=\"") + 6, line.indexOf(line.indexOf("href=\"") + 6, line.indexOf(">")));
             }
         }
         if (returnAlternateArchives && toReturn == null) {
             toReturn = alternativeReturn;
         }
-        return new URL(toReturn);
+        return new URL(new StringBuilder().append(repoURL.toExternalForm()).append("/").append(toReturn).toString());
+    }
+    
+        public static boolean NewVersionReleased(MavenJarFile jarFile,URL jarRepository) throws IOException, XMLStreamException {
+        boolean newVersion = false;
+        String latestRemoteRelease = WebDAO.getLatestVersionNumberFromRemoteRepo(new URL(new StringBuilder(jarRepository.toExternalForm()).append(jarFile.getGroupId().replaceAll("\\.", "/")).append("/").append(jarFile.getArtifactId()).append("/maven-metadata.xml").toString()));
+        if (new CompareVersionNumbers().compare(jarFile.getVersionNumber(), latestRemoteRelease) == 1) {
+            newVersion = true;
+        }
+        return newVersion;
     }
 }

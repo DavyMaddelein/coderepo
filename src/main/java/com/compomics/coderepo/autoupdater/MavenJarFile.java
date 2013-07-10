@@ -44,7 +44,7 @@ private String absoluteFilePath;
     }
     
     public String getVersionNumber(){
-        return mavenProperties.getProperty("versionNumber");
+        return mavenProperties.getProperty("version");
     }
 
     public String getAbsoluteFilePath() {

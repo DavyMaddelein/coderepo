@@ -1,5 +1,6 @@
 package com.compomics.coderepo.autoupdater;
 
+import java.awt.GraphicsEnvironment;
 import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.IOException;
@@ -19,6 +20,14 @@ import org.apache.commons.io.FileUtils;
  * @author Davy
  */
 public class DownloadLatestZipFromRepo {
+
+    public static void main(String[] args) {
+        try {
+            downloadLatestZipFromRepo(new File("C:\\Users\\Davy\\Desktop\\PeptideShaker-0.22.2\\PeptideShaker-0.22.2.jar").toURL(), true, true);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
 
     /**
      * downloads the latest deploy from the genesis maven repository of the
@@ -68,9 +77,7 @@ public class DownloadLatestZipFromRepo {
      * @throws URISyntaxException
      */
     public static void downloadLatestZipFromRepo(URL jarPath, boolean deleteOldFiles, String[] args, boolean startDownloadedVersion) throws IOException, XMLStreamException, URISyntaxException {
-        MavenJarFile mavenJarFile = new MavenJarFile(jarPath.toURI());
-        downloadLatestZipFromRepo(jarPath, deleteOldFiles, null, args, new URL("http", "genesis.ugent.be", new StringBuilder().append("/maven2/").append(mavenJarFile.getGroupId()).append("/").toString()), startDownloadedVersion);
-        //echo $javahome?
+        downloadLatestZipFromRepo(jarPath, deleteOldFiles, null, args, new URL("http", "genesis.ugent.be", new StringBuilder().append("/maven2/").toString()), startDownloadedVersion);
     }
 
     /**
@@ -114,18 +121,55 @@ public class DownloadLatestZipFromRepo {
      * @throws URISyntaxException
      */
     public static void downloadLatestZipFromRepo(final URL jarPath, boolean deleteOldFiles, String iconName, String[] args, URL jarRepository, boolean startDownloadedVersion) throws IOException, XMLStreamException, URISyntaxException {
+        if (GraphicsEnvironment.isHeadless()) {
+            downloadLatestZipFromRepo(jarPath, deleteOldFiles, iconName, args, jarRepository, startDownloadedVersion, new HeadlessFileDAO());
+        } else {
+            downloadLatestZipFromRepo(jarPath, deleteOldFiles, iconName, args, jarRepository, startDownloadedVersion, new GUIFileDAO());
+
+        }
+    }
+
+    /**
+     * retrieves the latest version of a maven jar file from a maven repository
+     *
+     * @param jarPath the URL of the location of the jar that needs to be
+     * updated on the file system. cannot be {@code null}
+     * @param deleteOldFiles should the old installation be removed or not
+     * cannot be {@code null}
+     * @param iconName name of the shortcut image should one be created
+     * @param args the args that will be passed to the newly downloaded program
+     * when started, cannot be {@code null}
+     * @param jarRepository the maven repository to go look in, cannot be
+     * {@code null}
+     * @param startDownloadedVersion if the newly downloaded version should be
+     * started automatically or not
+     * @param fileDAO what implementation of FileDAO should be used in the
+     * updating
+     * @throws IOException should there be problems with reading or writing
+     * files during the updating
+     * @throws XMLStreamException if there was a problem reading the meta data
+     * from the remote maven repository
+     * @throws URISyntaxException
+     */
+    public static void downloadLatestZipFromRepo(final URL jarPath, boolean deleteOldFiles, String iconName, String[] args, URL jarRepository, boolean startDownloadedVersion, FileDAO fileDAO) throws IOException, XMLStreamException, URISyntaxException {
         MavenJarFile oldMavenJarFile = new MavenJarFile(jarPath.toURI());
-        if (FileDAO.NewVersionReleased(oldMavenJarFile)) {
-            MavenJarFile downloadedJarFile = null;
+        if (WebDAO.NewVersionReleased(oldMavenJarFile, jarRepository)) {
+            MavenJarFile downloadedJarFile;
+            String artifactInRepoLocation = new StringBuilder(jarRepository.toExternalForm()).append(oldMavenJarFile.getGroupId().replaceAll("\\.", "/")).append("/").append(oldMavenJarFile.getArtifactId()).toString();
+            String latestRemoteRelease = WebDAO.getLatestVersionNumberFromRemoteRepo(new URL(new StringBuilder(artifactInRepoLocation).append("/maven-metadata.xml").toString()));
+            String latestArtifactLocation = new StringBuilder(artifactInRepoLocation).append("/").append(latestRemoteRelease).toString();
             if (System.getProperty("os.name").toLowerCase().contains("win")) {
-                downloadedJarFile = downloadAndUnzipJarForWindows(oldMavenJarFile, jarRepository);
-                FileDAO.createDesktopShortcut(downloadedJarFile, iconName, deleteOldFiles);
+                downloadedJarFile = downloadAndUnzipJarForWindows(oldMavenJarFile, new URL(latestArtifactLocation), fileDAO);
+                fileDAO.createDesktopShortcut(downloadedJarFile, iconName, deleteOldFiles);
             } else {
-                downloadedJarFile = downloadAndUnzipJarForUnix(oldMavenJarFile, jarRepository);
+                downloadedJarFile = downloadAndUnzipJarForUnix(oldMavenJarFile, new URL(latestArtifactLocation), fileDAO);
                 //update symlinks?
             }
             try {
-                if (launchJar(downloadedJarFile, args) && deleteOldFiles) {
+                if (startDownloadedVersion) {
+                    launchJar(downloadedJarFile, args);
+                }
+                if (deleteOldFiles) {
                     Runtime.getRuntime().addShutdownHook(new Thread() {
                         @Override
                         public void run() {
@@ -134,7 +178,7 @@ public class DownloadLatestZipFromRepo {
                                 if (jarParent.exists()) {
                                     FileUtils.deleteDirectory(jarParent);
                                 }
-                            } catch ( URISyntaxException | IOException ex) {
+                            } catch (URISyntaxException | IOException ex) {
                                 //todo handle stuff did not get done
                             }
                         }
@@ -152,7 +196,7 @@ public class DownloadLatestZipFromRepo {
     }
 
     /**
-     * simple jar launch through a {@code processBuilder}
+     * simple jar launch through a {@code ProcessBuilder}
      *
      * @param downloadedJarFile the downloaded jar file to start
      * @param args the args to give to the jar file
@@ -174,26 +218,38 @@ public class DownloadLatestZipFromRepo {
         return true;
     }
 
-    private static MavenJarFile downloadAndUnzipJarForWindows(MavenJarFile mavenJarFile, URL jarRepository) throws MalformedURLException, IOException, XMLStreamException {
+    /**
+     * aggregation method for prepping everything and then downloading
+     * @param mavenJarFile
+     * @param jarRepository
+     * @param fileDAO
+     * @return
+     * @throws MalformedURLException
+     * @throws IOException
+     * @throws XMLStreamException 
+     */
+    private static MavenJarFile downloadAndUnzipJarForWindows(MavenJarFile mavenJarFile, URL jarRepository, FileDAO fileDAO) throws MalformedURLException, IOException, XMLStreamException {
         MavenJarFile newMavenJar = null;
         URL archiveURL = WebDAO.getUrlOfZippedVersion(jarRepository, ".zip", false);
-        try {
-            newMavenJar = FileDAO.getMavenJarFileFromFolderWithArtifactId(FileDAO.downloadAndUnzipFile(new ZipInputStream(new BufferedInputStream(archiveURL.openStream())), new File(FileDAO.getLocationToDownloadOnDisk(mavenJarFile.getAbsoluteFilePath()), archiveURL.getFile())), mavenJarFile.getArtifactId());
-        } catch (IOException ioex) {
-            handleSilently(ioex);
+        String folderName = archiveURL.getFile().substring(archiveURL.getFile().lastIndexOf("/"), archiveURL.getFile().lastIndexOf(".zip"));
+        File downloadFolder = new File(fileDAO.getLocationToDownloadOnDisk(new File(mavenJarFile.getAbsoluteFilePath()).getParent()), folderName);
+        if (!downloadFolder.exists()) {
+            downloadFolder.mkdirs();
         }
+        ZipInputStream jarStream = new ZipInputStream(new BufferedInputStream(archiveURL.openStream()));
+        newMavenJar = fileDAO.getMavenJarFileFromFolderWithArtifactId(fileDAO.UnzipFile(jarStream, downloadFolder), mavenJarFile.getArtifactId());
         return newMavenJar;
     }
 
-    private static MavenJarFile downloadAndUnzipJarForUnix(MavenJarFile oldMavenJarFile, URL jarRepository) throws MalformedURLException, IOException, XMLStreamException {
+    private static MavenJarFile downloadAndUnzipJarForUnix(MavenJarFile oldMavenJarFile, URL jarRepository, FileDAO fileDAO) throws MalformedURLException, IOException, XMLStreamException {
         MavenJarFile downloadedJarFile = null;
         URL archiveURL = WebDAO.getUrlOfZippedVersion(jarRepository, ".tar.gz", true);
         if (archiveURL != null) {
-            downloadedJarFile = FileDAO.getMavenJarFileFromFolderWithArtifactId(FileDAO.downloadAndUnzipFile(new GZIPInputStream(archiveURL.openStream()), new File(FileDAO.getLocationToDownloadOnDisk(oldMavenJarFile.getAbsoluteFilePath()), archiveURL.getFile())), oldMavenJarFile.getArtifactId());
+            downloadedJarFile = fileDAO.getMavenJarFileFromFolderWithArtifactId(fileDAO.UnGzipAndUntarFile(new GZIPInputStream(archiveURL.openStream()), new File(fileDAO.getLocationToDownloadOnDisk(oldMavenJarFile.getAbsoluteFilePath()), archiveURL.getFile())), oldMavenJarFile.getArtifactId());
         } else {
             archiveURL = WebDAO.getUrlOfZippedVersion(jarRepository, ".zip", true);
             try {
-                downloadedJarFile = FileDAO.getMavenJarFileFromFolderWithArtifactId(FileDAO.downloadAndUnzipFile(new ZipInputStream(new BufferedInputStream(archiveURL.openStream())), new File(FileDAO.getLocationToDownloadOnDisk(oldMavenJarFile.getAbsoluteFilePath()), archiveURL.getFile())), oldMavenJarFile.getArtifactId());
+                downloadedJarFile = fileDAO.getMavenJarFileFromFolderWithArtifactId(fileDAO.UnzipFile(new ZipInputStream(new BufferedInputStream(archiveURL.openStream())), new File(fileDAO.getLocationToDownloadOnDisk(oldMavenJarFile.getAbsoluteFilePath()), archiveURL.getFile())), oldMavenJarFile.getArtifactId());
             } catch (IOException ioex) {
                 handleSilently(ioex);
             }
