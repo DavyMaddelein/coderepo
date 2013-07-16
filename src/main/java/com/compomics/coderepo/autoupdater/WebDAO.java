@@ -23,6 +23,7 @@ public class WebDAO {
         XMLInputFactory xmlParseFactory = XMLInputFactory.newInstance();
         XMLEventReader xmlReader = xmlParseFactory.createXMLEventReader(remoteVersionsReader);
         MetaDataXMLParser xmlParser = new MetaDataXMLParser(xmlReader);
+        xmlReader.close();
         return xmlParser.getHighestVersionNumber();
     }
 
@@ -45,7 +46,6 @@ public class WebDAO {
         String toReturn = null;
         String alternativeReturn = null;
         while ((line = reader.readLine()) != null) {
-            System.out.println(line);
             if (line.toLowerCase(LOCALE).contains("href=") && line.toLowerCase(LOCALE).contains(suffix)) {
                 toReturn = line.substring(line.indexOf("href=\"") + 6,line.indexOf(suffix,line.indexOf("href=\""))+suffix.length());
                 break;
@@ -53,18 +53,19 @@ public class WebDAO {
                 alternativeReturn = line.substring(line.indexOf("href=\"") + 6, line.indexOf(line.indexOf("href=\"") + 6, line.indexOf(">")));
             }
         }
+        reader.close();
         if (returnAlternateArchives && toReturn == null) {
             toReturn = alternativeReturn;
         }
         return new URL(new StringBuilder().append(repoURL.toExternalForm()).append("/").append(toReturn).toString());
     }
     
-        public static boolean NewVersionReleased(MavenJarFile jarFile,URL jarRepository) throws IOException, XMLStreamException {
+        public static boolean newVersionReleased(MavenJarFile jarFile,URL jarRepository) throws IOException, XMLStreamException {
         boolean newVersion = false;
         String latestRemoteRelease = WebDAO.getLatestVersionNumberFromRemoteRepo(new URL(new StringBuilder(jarRepository.toExternalForm()).append(jarFile.getGroupId().replaceAll("\\.", "/")).append("/").append(jarFile.getArtifactId()).append("/maven-metadata.xml").toString()));
         if (new CompareVersionNumbers().compare(jarFile.getVersionNumber(), latestRemoteRelease) == 1) {
             newVersion = true;
         }
         return newVersion;
-    }
+    } 
 }

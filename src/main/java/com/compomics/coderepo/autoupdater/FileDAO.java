@@ -5,16 +5,19 @@ import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.util.Locale;
+import java.util.Enumeration;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.ZipEntry;
-import java.util.zip.ZipInputStream;
+import java.util.zip.ZipFile;
 import net.jimmc.jshortcut.JShellLink;
 import org.apache.commons.compress.archivers.ArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
+import org.apache.commons.io.IOUtils;
 
 /**
  *
@@ -31,10 +34,8 @@ public abstract class FileDAO {
      * file artifact id should be removed
      * @throws IOException
      */
-     public abstract boolean createDesktopShortcut(MavenJarFile file, String iconName, boolean deleteOldShortcut) throws IOException;
-    
-    
-    
+    public abstract boolean createDesktopShortcut(MavenJarFile file, String iconName, boolean deleteOldShortcut) throws IOException;
+
     public boolean addShortcutAtDeskTop(MavenJarFile mavenJarFile) {
         return addShortcutAtDeskTop(mavenJarFile, null);
     }
@@ -53,41 +54,36 @@ public abstract class FileDAO {
     }
 
     /**
-     * 
+     *
      * @param targetDownloadFolder
      * @return
-     * @throws IOException 
+     * @throws IOException
      */
-public abstract File getLocationToDownloadOnDisk(String targetDownloadFolder) throws IOException;
+    public abstract File getLocationToDownloadOnDisk(String targetDownloadFolder) throws IOException;
 
     //rewrite both downloadAndUnzipFiles to use apache commons compress library?
-    public File UnzipFile(ZipInputStream in, File fileLocationOnDiskToDownloadTo) throws IOException {
-        BufferedWriter dest;
-        InputStreamReader isr = new InputStreamReader(in);
-        ZipEntry entry;
-        while ((entry = in.getNextEntry()) != null) {
-            int count;
-            char data[] = new char[1024];
+    public File unzipFile(ZipFile in, File fileLocationOnDiskToDownloadTo) throws IOException {
+        FileOutputStream dest;
+        Enumeration<? extends ZipEntry> zipFileEnum = in.entries();
+        while (zipFileEnum.hasMoreElements()) {
+            ZipEntry entry = zipFileEnum.nextElement();
             File destFile = new File(fileLocationOnDiskToDownloadTo + "/" + entry.getName());
             destFile.getParentFile().mkdirs();
             if (!entry.isDirectory()) {
-                dest = new BufferedWriter(new FileWriter(destFile), 1024);
-                while ((count = isr.read(data, 0, 1024)) != -1) {
-                    dest.write(data, 0, count);
-                }
-                dest.flush();
+                dest = new FileOutputStream(destFile);
+                InputStream inStream = in.getInputStream(entry);
+                IOUtils.copyLarge(inStream, dest);
                 dest.close();
+                inStream.close();
             } else {
                 destFile.mkdirs();
             }
-            in.closeEntry();
         }
-        isr.close();
         in.close();
         return fileLocationOnDiskToDownloadTo;
     }
 
-    public File UnGzipAndUntarFile(GZIPInputStream in, File fileLocationOnDiskToDownloadTo) throws IOException {
+    public File unGzipAndUntarFile(GZIPInputStream in, File fileLocationOnDiskToDownloadTo) throws IOException {
 
         InputStreamReader isr = new InputStreamReader(in);
         int count;
@@ -96,10 +92,8 @@ public abstract File getLocationToDownloadOnDisk(String targetDownloadFolder) th
         while ((count = isr.read(data, 0, 1024)) != -1) {
             dest.write(data, 0, count);
         }
-        dest.flush();
         dest.close();
         isr.close();
-        in.close();
         untar(fileLocationOnDiskToDownloadTo);
         return fileLocationOnDiskToDownloadTo;
     }
@@ -113,7 +107,7 @@ public abstract File getLocationToDownloadOnDisk(String targetDownloadFolder) th
         while ((entry = tarStream.getNextEntry()) != null) {
             char[] cbuf = new char[1024];
             int count;
-            FileWriter out = new FileWriter(new File(untarLocation + "/" + entry.getName()));
+            FileWriter out = new FileWriter(new File(String.format("%s/%s", untarLocation, entry.getName())));
             while ((count = bufferedTarReader.read(cbuf, 0, 1024)) != -1) {
                 out.write(cbuf, 0, count);
             }
@@ -127,23 +121,34 @@ public abstract File getLocationToDownloadOnDisk(String targetDownloadFolder) th
 
     public MavenJarFile getMavenJarFileFromFolderWithArtifactId(File folder, String artifactId) throws IOException {
         MavenJarFile mainJarFile = null;
-        for (File aJarFile : folder.listFiles()) {
-            if (aJarFile.isDirectory()) {
-                mainJarFile = getMavenJarFileFromFolderWithArtifactId(aJarFile, artifactId);
+        for (File aFile : folder.listFiles()) {
+            if (aFile.isDirectory()) {
+                mainJarFile = getMavenJarFileFromFolderWithArtifactId(aFile, artifactId);
                 if (mainJarFile != null) {
                     break;
                 }
             } else {
-                if (aJarFile.getName().toLowerCase(new Locale("en")).contains(artifactId) && aJarFile.getName().toLowerCase(new Locale("en")).contains(".jar")) {
-                    mainJarFile = new MavenJarFile(aJarFile);
+                if (aFile.getName().contains(artifactId) && aFile.getName().contains("jar")) {
+                    mainJarFile = new MavenJarFile(aFile);
                     break;
                 }
             }
         }
-        if (mainJarFile == null) {
-            //just in case
-            throw new FileNotFoundException("the jar file could not be found");
-        }
+        /**if (mainJarFile == null) {
+            throw new IOException("could not find jar file in folder and child folders");
+        }*/
         return mainJarFile;
+    }
+
+    public File writeStreamToDisk(InputStream in, String name, File outputLocationFolder) throws FileNotFoundException, IOException {
+        if (!outputLocationFolder.exists()) {
+            outputLocationFolder.mkdirs();
+        }
+        File outputFile = new File(outputLocationFolder, name);
+        FileOutputStream out = new FileOutputStream(outputFile);
+        IOUtils.copyLarge(in, out);
+        out.close();
+        in.close();
+        return outputFile;
     }
 }

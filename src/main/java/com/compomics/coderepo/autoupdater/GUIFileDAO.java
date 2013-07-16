@@ -25,8 +25,10 @@ public class GUIFileDAO extends FileDAO {
     @Override
     public boolean createDesktopShortcut(MavenJarFile file, String iconName, boolean deleteOldShortcut) throws IOException {
         Properties compomicsArtifactProperties = new Properties();
-        File compomicsArtifactPropertiesFile = new File(new StringBuilder().append(System.getProperty("Users.home")).append("/.compomics/").append(file.getArtifactId()).append("updatesettings.properties").toString());
-        compomicsArtifactProperties.load(new FileReader(compomicsArtifactPropertiesFile));
+        File compomicsArtifactPropertiesFile = new File(new StringBuilder().append(System.getProperty("user.home")).append("/.compomics/").append(file.getArtifactId()).append("updatesettings.properties").toString());
+        if (compomicsArtifactPropertiesFile.exists()) {
+            compomicsArtifactProperties.load(new FileReader(compomicsArtifactPropertiesFile));
+        }
         int selection;
         if (!compomicsArtifactProperties.contains("create_shortcut")) {
             Object[] options = new Object[]{"yes", "no", "ask me next update"};
@@ -37,21 +39,21 @@ public class GUIFileDAO extends FileDAO {
                 compomicsArtifactProperties.setProperty("create_shortcut", String.valueOf(selection));
                 compomicsArtifactProperties.store(new FileOutputStream(compomicsArtifactPropertiesFile), null);
             }
-        }
-        try {
-            selection = Integer.parseInt(compomicsArtifactProperties.getProperty("create_shortcut"));
-            if (selection == JOptionPane.YES_OPTION) {
-                addShortcutAtDeskTop(file, iconName);
-            }
-            if (deleteOldShortcut) {
-                for (String fileName : new File(System.getProperty("User.home")).list()) {
+            try {
+                if (selection == JOptionPane.YES_OPTION) {
+                    addShortcutAtDeskTop(file, iconName);
                 }
-
+                if (deleteOldShortcut) {
+                    for (String fileName : new File(System.getProperty("user.home")).list()) {
+                    }
+                }
+            } catch (NullPointerException npe) {
+                throw new IOException("could not create the shortcut");
+            } catch (NumberFormatException nfe) {
+                throw new IOException("could not create the shortcut");
             }
-        } catch (NullPointerException npe) {
-            throw new IOException("could not create the shortcut");
-        } catch (NumberFormatException nfe) {
-            throw new IOException("could not create the shortcut");
+        } else {
+            //TODO
         }
         return true;
     }
@@ -63,7 +65,7 @@ public class GUIFileDAO extends FileDAO {
     @Override
     public File getLocationToDownloadOnDisk(String targetDownloadFolder) throws IOException {
         File file = new File(targetDownloadFolder).getParentFile();
-        while (file.exists() && !file.isDirectory()) {
+        if (file.exists() && !file.isDirectory()) {
             file = file.getParentFile();
         }
         if (file == null) {
